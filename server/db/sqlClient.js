@@ -1,168 +1,98 @@
 /**
- * Azure SQL Database Client
- * Uses tedious driver for Azure SQL connectivity
- * Connection pooling and error handling included
+ * Azure SQL Database Client using mssql driver
  */
 
-const { Connection, Request, TYPES } = require('tedious');
-const { ConnectionPool } = require('tedious-connection-pool');
+const sql = require('mssql');
 
-// SQL Connection Configuration
+// Log config for debugging (redact password)
+console.log('🔍 SQL Config:', {
+  server: process.env.SQL_SERVER,
+  database: process.env.SQL_DATABASE,
+  user: process.env.SQL_USER,
+  password: process.env.SQL_PASSWORD ? `[${process.env.SQL_PASSWORD.length} chars]` : 'MISSING',
+  passwordFirstChar: process.env.SQL_PASSWORD ? process.env.SQL_PASSWORD[0] : 'N/A',
+  passwordLastChar: process.env.SQL_PASSWORD ? process.env.SQL_PASSWORD[process.env.SQL_PASSWORD.length - 1] : 'N/A'
+});
+
 const config = {
   server: process.env.SQL_SERVER,
-  authentication: {
-    type: 'default',
-    options: {
-      userName: process.env.SQL_USER,
-      password: process.env.SQL_PASSWORD
-    }
-  },
+  database: process.env.SQL_DATABASE,
+  user: process.env.SQL_USER,
+  password: process.env.SQL_PASSWORD,
   options: {
-    database: process.env.SQL_DATABASE,
-    encrypt: process.env.SQL_ENCRYPT === 'true',
-    trustServerCertificate: process.env.SQL_TRUST_SERVER_CERTIFICATE === 'true',
-    connectTimeout: 30000,
-    requestTimeout: 30000,
-    rowCollectionOnDone: true,
-    rowCollectionOnRequestCompletion: true
+    encrypt: true,
+    trustServerCertificate: false,
+    enableArithAbort: true
+  },
+  connectionTimeout: 30000,
+  requestTimeout: 30000,
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000
   }
 };
 
-// Connection Pool Configuration
-const poolConfig = {
-  min: 2,
-  max: 10,
-  idleTimeout: 30000,
-  retryDelay: 5000,
-  acquireTimeout: 30000
-};
+const pool = new sql.ConnectionPool(config);
+const poolConnect = pool.connect();
 
-// Create connection pool
-const pool = new ConnectionPool(poolConfig, config);
-
-pool.on('error', (err) => {
-  console.error('SQL Pool Error:', err);
-});
+// Log connection attempts
+poolConnect
+  .then(() => {
+    console.log('✅ Database connection pool established');
+  })
+  .catch(err => {
+    console.error('❌ Database connection failed:', err.message);
+    console.error('Full error:', err);
+  });
 
 /**
  * Execute SQL query with parameters
- * @param {string} query - SQL query string
- * @param {object} params - Query parameters
- * @returns {Promise<Array>} Query results
  */
-function executeQuery(query, params = {}) {
-  return new Promise((resolve, reject) => {
-    pool.acquire((err, connection) => {
-      if (err) {
-        return reject(err);
-      }
-
-      const request = new Request(query, (err, rowCount, rows) => {
-        connection.release();
-
-        if (err) {
-          return reject(err);
-        }
-
-        // Transform rows to objects
-        const results = rows.map(row => {
-          const obj = {};
-          row.forEach(column => {
-            obj[column.metadata.colName] = column.value;
-          });
-          return obj;
-        });
-
-        resolve(results);
-      });
-
-      // Add parameters
-      Object.keys(params).forEach(key => {
-        const value = params[key];
-        const type = inferSQLType(value);
-        request.addParameter(key, type, value);
-      });
-
-      connection.execSql(request);
+async function executeQuery(query, params = {}) {
+  try {
+    await poolConnect;
+    const request = pool.request();
+    Object.keys(params).forEach(key => {
+      request.input(key, params[key]);
     });
-  });
+    const result = await request.query(query);
+    return result.recordset;
+  } catch (error) {
+    console.error('Query execution error:', error.message);
+    throw error;
+  }
 }
 
 /**
  * Execute stored procedure
- * @param {string} procedureName - Name of stored procedure
- * @param {object} params - Procedure parameters
- * @returns {Promise<Array>} Procedure results
  */
-function executeStoredProcedure(procedureName, params = {}) {
-  return new Promise((resolve, reject) => {
-    pool.acquire((err, connection) => {
-      if (err) {
-        return reject(err);
-      }
-
-      const request = new Request(procedureName, (err, rowCount, rows) => {
-        connection.release();
-
-        if (err) {
-          return reject(err);
-        }
-
-        const results = rows.map(row => {
-          const obj = {};
-          row.forEach(column => {
-            obj[column.metadata.colName] = column.value;
-          });
-          return obj;
-        });
-
-        resolve(results);
-      });
-
-      // Add parameters
-      Object.keys(params).forEach(key => {
-        const value = params[key];
-        const type = inferSQLType(value);
-        request.addParameter(key, type, value);
-      });
-
-      connection.callProcedure(request);
+async function executeStoredProcedure(procedureName, params = {}) {
+  try {
+    await poolConnect;
+    const request = pool.request();
+    Object.keys(params).forEach(key => {
+      request.input(key, params[key]);
     });
-  });
-}
-
-/**
- * Infer SQL type from JavaScript value
- * @param {*} value - JavaScript value
- * @returns {object} Tedious type constant
- */
-function inferSQLType(value) {
-  if (typeof value === 'number') {
-    return Number.isInteger(value) ? TYPES.Int : TYPES.Float;
+    const result = await request.execute(procedureName);
+    return result.recordset;
+  } catch (error) {
+    console.error('Stored procedure execution error:', error.message);
+    throw error;
   }
-  if (typeof value === 'boolean') {
-    return TYPES.Bit;
-  }
-  if (value instanceof Date) {
-    return TYPES.DateTime2;
-  }
-  if (value === null || value === undefined) {
-    return TYPES.NVarChar;
-  }
-  return TYPES.NVarChar;
 }
 
 /**
  * Test database connection
- * @returns {Promise<boolean>}
  */
 async function testConnection() {
   try {
-    const results = await executeQuery('SELECT 1 as test');
-    console.log('✅ Database connection successful');
+    await poolConnect;
+    const result = await pool.request().query('SELECT 1 as test');
+    console.log('✅ Database connection test successful');
     return true;
   } catch (error) {
-    console.error('❌ Database connection failed:', error.message);
+    console.error('❌ Database connection test failed:', error.message);
     return false;
   }
 }
@@ -170,13 +100,13 @@ async function testConnection() {
 /**
  * Close all database connections
  */
-function closePool() {
-  return new Promise((resolve) => {
-    pool.drain(() => {
-      console.log('Database connection pool closed');
-      resolve();
-    });
-  });
+async function closePool() {
+  try {
+    await pool.close();
+    console.log('Database connection pool closed');
+  } catch (error) {
+    console.error('Error closing pool:', error.message);
+  }
 }
 
 // Graceful shutdown
@@ -191,9 +121,11 @@ process.on('SIGTERM', async () => {
 });
 
 module.exports = {
+  sql,
+  pool,
+  poolConnect,
   executeQuery,
   executeStoredProcedure,
   testConnection,
-  closePool,
-  TYPES
+  closePool
 };

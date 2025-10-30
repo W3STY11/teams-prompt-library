@@ -7,12 +7,12 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const { executeQuery, executeStoredProcedure, testConnection } = require('./db/sqlClient');
+const { pool, poolConnect, executeQuery, executeStoredProcedure, testConnection } = require('./db/sqlClient');
 const { validateToken, optionalAuth, extractTenant } = require('./middleware/auth');
 const { requireRole, auditLog } = require('./middleware/rbac');
 
 const app = express();
-const PORT = process.env.API_PORT || 3001;
+const PORT = process.env.PORT || 3001;
 
 // ============================================================================
 // MIDDLEWARE
@@ -59,27 +59,19 @@ if (process.env.NODE_ENV === 'development') {
 // HEALTH CHECK ENDPOINTS
 // ============================================================================
 
+// DB-independent health check
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0'
-  });
+  res.status(200).json({ ok: true });
 });
 
-app.get('/api/health', async (req, res) => {
+// Database connectivity check
+app.get('/db-ping', async (req, res) => {
   try {
-    const dbHealthy = await testConnection();
-    res.json({
-      status: dbHealthy ? 'healthy' : 'degraded',
-      database: dbHealthy ? 'connected' : 'disconnected',
-      timestamp: new Date().toISOString()
-    });
+    await poolConnect;
+    const result = await pool.request().query('SELECT 1 AS ok');
+    res.json({ ok: true, result: result.recordset });
   } catch (error) {
-    res.status(500).json({
-      status: 'unhealthy',
-      error: error.message
-    });
+    res.status(500).json({ ok: false, error: String(error) });
   }
 });
 
@@ -593,37 +585,10 @@ app.use((err, req, res, next) => {
 // START SERVER
 // ============================================================================
 
-async function startServer() {
-  try {
-    // Test database connection
-    const dbConnected = await testConnection();
+const port = process.env.PORT || 3001;
 
-    if (!dbConnected) {
-      console.error('❌ Failed to connect to database. Check your configuration.');
-      process.exit(1);
-    }
-
-    app.listen(PORT, () => {
-      console.log(`
-╔═══════════════════════════════════════════════════════════╗
-║  Teams Prompt Library API Server                         ║
-║  Status: Running ✅                                       ║
-║  Port: ${PORT}                                           ║
-║  Environment: ${process.env.NODE_ENV || 'development'}  ║
-║  Database: Connected ✅                                  ║
-╚═══════════════════════════════════════════════════════════╝
-      `);
-    });
-
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
-}
-
-// Start the server
-if (require.main === module) {
-  startServer();
-}
+app.listen(port, () => {
+  console.log('Server listening on', port);
+});
 
 module.exports = app;
