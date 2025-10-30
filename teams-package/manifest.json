@@ -1,0 +1,79 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "68e9b7bd-1c92-407e-815b-30af21d30d09",
+  "packageName": "com.yourcompany.promptlibrary",
+  "developer": {
+    "name": "Prompt Library",
+    "websiteUrl": "https://polite-pond-0c32bd30f.3.azurestaticapps.net",
+    "privacyUrl": "https://polite-pond-0c32bd30f.3.azurestaticapps.net/privacy",
+    "termsOfUseUrl": "https://polite-pond-0c32bd30f.3.azurestaticapps.net/terms"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "Prompt Library",
+    "full": "Enterprise AI Prompt Library - 2,376+ Professional Prompts"
+  },
+  "description": {
+    "short": "Manage and share AI prompts across your organization",
+    "full": "Enterprise-grade prompt library with 2,376+ professional AI prompts across 9 business departments. Features include advanced search, favorites, team collaboration, and governance workflows. Built for secure, scalable, multi-tenant deployment."
+  },
+  "accentColor": "#0078D4",
+  "staticTabs": [
+    {
+      "entityId": "promptLibraryHome",
+      "name": "Browse",
+      "contentUrl": "https://polite-pond-0c32bd30f.3.azurestaticapps.net/index.html",
+      "websiteUrl": "https://polite-pond-0c32bd30f.3.azurestaticapps.net",
+      "scopes": ["personal"]
+    },
+    {
+      "entityId": "promptLibraryFavorites",
+      "name": "Favorites",
+      "contentUrl": "https://polite-pond-0c32bd30f.3.azurestaticapps.net/index.html#/favorites",
+      "websiteUrl": "https://polite-pond-0c32bd30f.3.azurestaticapps.net/favorites",
+      "scopes": ["personal"]
+    }
+  ],
+  "configurableTabs": [
+    {
+      "configurationUrl": "https://polite-pond-0c32bd30f.3.azurestaticapps.net/config.html",
+      "canUpdateConfiguration": true,
+      "scopes": ["team", "groupchat"],
+      "context": [
+        "channelTab",
+        "privateChatTab",
+        "meetingChatTab"
+      ]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "polite-pond-0c32bd30f.3.azurestaticapps.net",
+    "promptlib-api.delightfulsmoke-83247bbb.eastus2.azurecontainerapps.io",
+    "token.botframework.com",
+    "*.azurestaticapps.net",
+    "login.microsoftonline.com"
+  ],
+  "webApplicationInfo": {
+    "id": "68e9b7bd-1c92-407e-815b-30af21d30d09",
+    "resource": "api://polite-pond-0c32bd30f.3.azurestaticapps.net/68e9b7bd-1c92-407e-815b-30af21d30d09"
+  },
+  "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        {
+          "name": "TeamSettings.Read.Group",
+          "type": "Application"
+        }
+      ]
+    }
+  }
+}

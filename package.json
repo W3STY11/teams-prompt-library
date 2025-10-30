@@ -1,0 +1,48 @@
+{
+  "name": "teams-prompt-library",
+  "version": "1.0.0",
+  "description": "Enterprise AI Prompt Library for Microsoft Teams - Multi-tenant prompt management with 2,376+ professional prompts across 9 business departments",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:api\"",
+    "dev:frontend": "cd src && vite",
+    "dev:api": "cd server && nodemon api.js",
+    "build": "cd src && vite build",
+    "build:api": "echo 'No build step needed for Express API'",
+    "test": "echo 'Tests will be added in Phase 2'",
+    "start": "node server/api.js",
+    "deploy:frontend": "cd src && vite build && echo 'Deploy dist/ to Azure Static Web Apps'",
+    "deploy:api": "echo 'Deploy server/ to Azure Container Apps'",
+    "db:migrate": "node scripts/migrate-json-to-sql.js"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "^3.7.0",
+    "@azure/msal-node": "^2.5.0",
+    "@fluentui/react-components": "^9.54.0",
+    "@fluentui/react-icons": "^2.0.258",
+    "@microsoft/teams-js": "^2.26.0",
+    "express": "^5.1.0",
+    "tedious": "^18.6.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "cors": "^2.8.5",
+    "helmet": "^8.0.0",
+    "dotenv": "^16.4.7",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "concurrently": "^9.1.0",
+    "nodemon": "^3.1.7",
+    "vite": "^5.4.11",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Your Organization",
+  "license": "MIT"
+}
