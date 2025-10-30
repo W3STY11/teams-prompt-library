@@ -3,7 +3,6 @@
   "manifestVersion": "1.17",
   "version": "1.0.0",
   "id": "68e9b7bd-1c92-407e-815b-30af21d30d09",
-  "packageName": "com.yourcompany.promptlibrary",
   "developer": {
     "name": "Prompt Library",
     "websiteUrl": "https://polite-pond-0c32bd30f.3.azurestaticapps.net",
@@ -16,11 +15,11 @@
   },
   "name": {
     "short": "Prompt Library",
-    "full": "Enterprise AI Prompt Library - 2,376+ Professional Prompts"
+    "full": "Enterprise AI Prompt Library - 2,423 Professional Prompts"
   },
   "description": {
     "short": "Manage and share AI prompts across your organization",
-    "full": "Enterprise-grade prompt library with 2,376+ professional AI prompts across 9 business departments. Features include advanced search, favorites, team collaboration, and governance workflows. Built for secure, scalable, multi-tenant deployment."
+    "full": "Enterprise-grade prompt library with 2,423 professional AI prompts across 9 business departments. Features include advanced search, favorites, team collaboration, and governance workflows. Built for secure, scalable, multi-tenant deployment."
   },
   "accentColor": "#0078D4",
   "staticTabs": [
