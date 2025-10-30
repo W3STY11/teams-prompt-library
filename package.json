@@ -20,16 +20,16 @@
     "@fluentui/react-components": "^9.54.0",
     "@fluentui/react-icons": "^2.0.258",
     "@microsoft/teams-js": "^2.26.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "express": "^5.1.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0",
     "mssql": "^10.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.0",
-    "cors": "^2.8.5",
-    "helmet": "^8.0.0",
-    "dotenv": "^16.4.7",
-    "jsonwebtoken": "^9.0.2",
-    "jwks-rsa": "^3.1.0"
+    "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
@@ -37,8 +37,9 @@
     "@vitejs/plugin-react": "^4.3.3",
     "concurrently": "^9.1.0",
     "nodemon": "^3.1.7",
-    "vite": "^5.4.11",
-    "typescript": "^5.6.3"
+    "playwright": "^1.56.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
   },
   "engines": {
     "node": ">=18.0.0"

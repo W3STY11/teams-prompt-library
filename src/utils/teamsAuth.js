@@ -23,14 +23,22 @@ const msalConfig = {
 
 // Create MSAL instance
 let msalInstance = null;
+let initPromise = null;
 
 /**
  * Initialize MSAL instance
  */
-export function initializeMSAL() {
+export async function initializeMSAL() {
   if (!msalInstance) {
     msalInstance = new msal.PublicClientApplication(msalConfig);
+    initPromise = msalInstance.initialize();
   }
+
+  if (initPromise) {
+    await initPromise;
+    initPromise = null;
+  }
+
   return msalInstance;
 }
 

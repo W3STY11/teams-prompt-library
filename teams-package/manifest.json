@@ -72,6 +72,24 @@
           "name": "TeamSettings.Read.Group",
           "type": "Application"
         }
+      ],
+      "orgWide": [
+        {
+          "name": "User.Read",
+          "type": "Delegated"
+        },
+        {
+          "name": "openid",
+          "type": "Delegated"
+        },
+        {
+          "name": "profile",
+          "type": "Delegated"
+        },
+        {
+          "name": "email",
+          "type": "Delegated"
+        }
       ]
     }
   }
