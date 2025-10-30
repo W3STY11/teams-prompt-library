@@ -48,7 +48,7 @@ export async function initializeMSAL() {
  * @returns {Promise<string>} Access token
  */
 export async function getAccessToken(scopes = ['User.Read']) {
-  const msal = initializeMSAL();
+  const msal = await initializeMSAL();
 
   try {
     // Get account (should be available after initial login)
@@ -101,7 +101,7 @@ export async function getAccessToken(scopes = ['User.Read']) {
  * @returns {Promise<object>} User account information
  */
 export async function signIn() {
-  const msal = initializeMSAL();
+  const msal = await initializeMSAL();
 
   try {
     // Check if already signed in
@@ -131,7 +131,7 @@ export async function signIn() {
  * Sign out user
  */
 export async function signOut() {
-  const msal = initializeMSAL();
+  const msal = await initializeMSAL();
 
   try {
     const accounts = msal.getAllAccounts();
@@ -157,18 +157,19 @@ export async function signOut() {
  * Get current user account
  * @returns {object|null} Current user account or null
  */
-export function getCurrentAccount() {
-  const msal = initializeMSAL();
+export async function getCurrentAccount() {
+  const msal = await initializeMSAL();
   const accounts = msal.getAllAccounts();
   return accounts.length > 0 ? accounts[0] : null;
 }
 
 /**
  * Check if user is signed in
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
-export function isSignedIn() {
-  return getCurrentAccount() !== null;
+export async function isSignedIn() {
+  const account = await getCurrentAccount();
+  return account !== null;
 }
 
 /**
@@ -261,7 +262,7 @@ export async function authenticatedFetch(url, options = {}) {
  */
 export async function initializeAuth() {
   try {
-    const msal = initializeMSAL();
+    const msal = await initializeMSAL();
 
     // Handle redirect response (if any)
     await msal.handleRedirectPromise();
