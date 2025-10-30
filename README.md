@@ -412,3 +412,4 @@ Based on 40+ hours of research across Microsoft documentation, Azure pricing, an
 
 **Built with research, not marketing hype.**
 # Teams SSO Configuration - Thu Oct 30 14:36:59 EDT 2025
+# Trigger deployment
