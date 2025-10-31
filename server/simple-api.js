@@ -203,36 +203,264 @@ app.get('/api/departments', async (req, res) => {
   }
 });
 
-// Favorites endpoints (NO AUTH - use in-memory for now)
-const favorites = new Map(); // user_id -> Set of prompt_ids
+// =============================================================================
+// FAVORITES ENDPOINTS (SQL-BASED)
+// =============================================================================
 
-app.get('/api/favorites', (req, res) => {
-  const userId = req.headers['x-user-id'] || 'anonymous';
-  const userFavorites = favorites.get(userId) || new Set();
-  res.json({ favorites: Array.from(userFavorites) });
+// Get user's favorites from SQL database
+app.get('/api/favorites', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] || 'anonymous';
+
+    const result = await pool.request()
+      .input('user_id', sql.NVarChar, userId)
+      .query('SELECT prompt_id FROM favorites WHERE user_id = @user_id');
+
+    const favorites = result.recordset.map(row => row.prompt_id);
+    res.json({ favorites });
+
+  } catch (error) {
+    console.error('Error fetching favorites:', error);
+    res.status(500).json({ error: 'Failed to fetch favorites', details: error.message });
+  }
 });
 
-app.post('/api/favorites/:id', (req, res) => {
-  const userId = req.headers['x-user-id'] || 'anonymous';
-  const { id } = req.params;
+// Add prompt to favorites
+app.post('/api/favorites/:id', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] || 'anonymous';
+    const { id } = req.params;
 
-  if (!favorites.has(userId)) {
-    favorites.set(userId, new Set());
+    // Insert if not exists (MERGE ensures no duplicates)
+    await pool.request()
+      .input('user_id', sql.NVarChar, userId)
+      .input('prompt_id', sql.NVarChar, id)
+      .query(`
+        MERGE INTO favorites AS target
+        USING (VALUES (@user_id, @prompt_id)) AS source (user_id, prompt_id)
+        ON target.user_id = source.user_id AND target.prompt_id = source.prompt_id
+        WHEN NOT MATCHED THEN
+          INSERT (user_id, prompt_id) VALUES (source.user_id, source.prompt_id);
+      `);
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Error adding favorite:', error);
+    res.status(500).json({ error: 'Failed to add favorite', details: error.message });
   }
-
-  favorites.get(userId).add(id);
-  res.json({ success: true });
 });
 
-app.delete('/api/favorites/:id', (req, res) => {
-  const userId = req.headers['x-user-id'] || 'anonymous';
-  const { id } = req.params;
+// Remove prompt from favorites
+app.delete('/api/favorites/:id', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] || 'anonymous';
+    const { id } = req.params;
 
-  if (favorites.has(userId)) {
-    favorites.get(userId).delete(id);
+    await pool.request()
+      .input('user_id', sql.NVarChar, userId)
+      .input('prompt_id', sql.NVarChar, id)
+      .query('DELETE FROM favorites WHERE user_id = @user_id AND prompt_id = @prompt_id');
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Error removing favorite:', error);
+    res.status(500).json({ error: 'Failed to remove favorite', details: error.message });
   }
+});
 
-  res.json({ success: true });
+// =============================================================================
+// DEPARTMENT & SUBCATEGORY ADMIN ENDPOINTS (NO AUTH FOR NOW)
+// =============================================================================
+
+// Get all departments with metadata from departments table
+app.get('/api/admin/departments', async (req, res) => {
+  try {
+    const result = await pool.request().query(`
+      SELECT id, name, icon, display_order, created_at, updated_at
+      FROM departments
+      ORDER BY display_order, name
+    `);
+
+    res.json(result.recordset);
+  } catch (error) {
+    console.error('Error fetching departments:', error);
+    res.status(500).json({ error: 'Failed to fetch departments', details: error.message });
+  }
+});
+
+// Create new department
+app.post('/api/admin/departments', async (req, res) => {
+  try {
+    const { name, icon, display_order } = req.body;
+
+    if (!name || !icon) {
+      return res.status(400).json({ error: 'Name and icon are required' });
+    }
+
+    const result = await pool.request()
+      .input('name', sql.NVarChar, name)
+      .input('icon', sql.NVarChar, icon)
+      .input('display_order', sql.Int, display_order || 999)
+      .query(`
+        INSERT INTO departments (name, icon, display_order)
+        VALUES (@name, @icon, @display_order);
+        SELECT id, name, icon, display_order, created_at, updated_at
+        FROM departments
+        WHERE id = SCOPE_IDENTITY();
+      `);
+
+    res.json(result.recordset[0]);
+  } catch (error) {
+    console.error('Error creating department:', error);
+    res.status(500).json({ error: 'Failed to create department', details: error.message });
+  }
+});
+
+// Update department
+app.put('/api/admin/departments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, icon, display_order } = req.body;
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('name', sql.NVarChar, name)
+      .input('icon', sql.NVarChar, icon)
+      .input('display_order', sql.Int, display_order)
+      .query(`
+        UPDATE departments
+        SET name = @name, icon = @icon, display_order = @display_order, updated_at = GETDATE()
+        WHERE id = @id
+      `);
+
+    const result = await pool.request()
+      .input('id', sql.Int, id)
+      .query('SELECT * FROM departments WHERE id = @id');
+
+    res.json(result.recordset[0]);
+  } catch (error) {
+    console.error('Error updating department:', error);
+    res.status(500).json({ error: 'Failed to update department', details: error.message });
+  }
+});
+
+// Delete department
+app.delete('/api/admin/departments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .query('DELETE FROM departments WHERE id = @id');
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting department:', error);
+    res.status(500).json({ error: 'Failed to delete department', details: error.message });
+  }
+});
+
+// Get all subcategories (optionally filtered by department)
+app.get('/api/admin/subcategories', async (req, res) => {
+  try {
+    const { department } = req.query;
+
+    let query = `
+      SELECT id, name, department_name, display_order, created_at, updated_at
+      FROM subcategories
+    `;
+
+    if (department) {
+      query += ' WHERE department_name = @department';
+    }
+
+    query += ' ORDER BY department_name, display_order, name';
+
+    const request = pool.request();
+    if (department) {
+      request.input('department', sql.NVarChar, department);
+    }
+
+    const result = await request.query(query);
+    res.json(result.recordset);
+  } catch (error) {
+    console.error('Error fetching subcategories:', error);
+    res.status(500).json({ error: 'Failed to fetch subcategories', details: error.message });
+  }
+});
+
+// Create new subcategory
+app.post('/api/admin/subcategories', async (req, res) => {
+  try {
+    const { name, department_name, display_order } = req.body;
+
+    if (!name || !department_name) {
+      return res.status(400).json({ error: 'Name and department_name are required' });
+    }
+
+    const result = await pool.request()
+      .input('name', sql.NVarChar, name)
+      .input('department_name', sql.NVarChar, department_name)
+      .input('display_order', sql.Int, display_order || 999)
+      .query(`
+        INSERT INTO subcategories (name, department_name, display_order)
+        VALUES (@name, @department_name, @display_order);
+        SELECT id, name, department_name, display_order, created_at, updated_at
+        FROM subcategories
+        WHERE id = SCOPE_IDENTITY();
+      `);
+
+    res.json(result.recordset[0]);
+  } catch (error) {
+    console.error('Error creating subcategory:', error);
+    res.status(500).json({ error: 'Failed to create subcategory', details: error.message });
+  }
+});
+
+// Update subcategory
+app.put('/api/admin/subcategories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, department_name, display_order } = req.body;
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('name', sql.NVarChar, name)
+      .input('department_name', sql.NVarChar, department_name)
+      .input('display_order', sql.Int, display_order)
+      .query(`
+        UPDATE subcategories
+        SET name = @name, department_name = @department_name, display_order = @display_order, updated_at = GETDATE()
+        WHERE id = @id
+      `);
+
+    const result = await pool.request()
+      .input('id', sql.Int, id)
+      .query('SELECT * FROM subcategories WHERE id = @id');
+
+    res.json(result.recordset[0]);
+  } catch (error) {
+    console.error('Error updating subcategory:', error);
+    res.status(500).json({ error: 'Failed to update subcategory', details: error.message });
+  }
+});
+
+// Delete subcategory
+app.delete('/api/admin/subcategories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .query('DELETE FROM subcategories WHERE id = @id');
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting subcategory:', error);
+    res.status(500).json({ error: 'Failed to delete subcategory', details: error.message });
+  }
 });
 
 // =============================================================================
