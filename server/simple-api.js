@@ -91,9 +91,28 @@ app.get('/api/prompts', async (req, res) => {
       return prompt;
     });
 
+    // Extract unique departments with counts and icons
+    const departmentMap = new Map();
+    prompts.forEach(prompt => {
+      if (prompt.department) {
+        if (!departmentMap.has(prompt.department)) {
+          departmentMap.set(prompt.department, {
+            name: prompt.department,
+            icon: prompt.icon || '📁',
+            prompt_count: 0
+          });
+        }
+        departmentMap.get(prompt.department).prompt_count++;
+      }
+    });
+
+    const departments = Array.from(departmentMap.values())
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     res.json({
       prompts,
-      count: prompts.length
+      count: prompts.length,
+      departments
     });
     
   } catch (error) {
