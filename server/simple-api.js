@@ -47,8 +47,8 @@ app.get('/health', (req, res) => {
 // Get all prompts (NO AUTH REQUIRED FOR NOW)
 app.get('/api/prompts', async (req, res) => {
   try {
-    const { department, search, limit = 1000 } = req.query;
-    
+    const { department, search, limit = 10000 } = req.query;
+
     let query = 'SELECT TOP (@limit) * FROM prompts WHERE 1=1';
     const request = pool.request();
     request.input('limit', sql.Int, parseInt(limit));
