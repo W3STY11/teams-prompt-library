@@ -18,5 +18,5 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Run the API
-CMD ["node", "server/api.js"]
+# Run the simplified API
+CMD ["node", "server/simple-api.js"]

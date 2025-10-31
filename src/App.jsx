@@ -79,11 +79,11 @@ function App({ teamsContext: initialTeamsContext, isInTeams, initialTheme }) {
         await initializeAuth();
 
         // Check if user is signed in
-        const signedIn = isSignedIn();
+        const signedIn = await isSignedIn();
         setIsAuthenticated(signedIn);
 
         if (signedIn) {
-          const account = getCurrentAccount();
+          const account = await getCurrentAccount();
           setUserAccount(account);
           console.log('✅ User authenticated:', account?.username);
         }
@@ -117,7 +117,7 @@ function App({ teamsContext: initialTeamsContext, isInTeams, initialTheme }) {
 
       await signIn();
 
-      const account = getCurrentAccount();
+      const account = await getCurrentAccount();
       setUserAccount(account);
       setIsAuthenticated(true);
 

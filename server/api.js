@@ -171,6 +171,9 @@ app.post('/api/prompts', validateToken, extractTenant, requireRole('contributor'
       complexity,
       icon,
       tips,
+      additional_tips,
+      what_it_does,
+      example_output,
       visibility = 'tenant'
     } = req.body;
 
@@ -184,8 +187,8 @@ app.post('/api/prompts', validateToken, extractTenant, requireRole('contributor'
 
     await executeQuery(
       `INSERT INTO prompts
-       (id, title, department, subcategory, description, content, tags, word_count, complexity, icon, tips, tenant_id, visibility, created_by)
-       VALUES (@id, @title, @department, @subcategory, @description, @content, @tags, @wordCount, @complexity, @icon, @tips, @tenantId, @visibility, @createdBy)`,
+       (id, title, department, subcategory, description, content, tags, word_count, complexity, icon, tips, additional_tips, what_it_does, example_output, tenant_id, visibility, created_by)
+       VALUES (@id, @title, @department, @subcategory, @description, @content, @tags, @wordCount, @complexity, @icon, @tips, @additionalTips, @whatItDoes, @exampleOutput, @tenantId, @visibility, @createdBy)`,
       {
         id: promptId,
         title,
@@ -198,6 +201,9 @@ app.post('/api/prompts', validateToken, extractTenant, requireRole('contributor'
         complexity: complexity || 'Intermediate',
         icon: icon || '📝',
         tips: JSON.stringify(tips || []),
+        additionalTips: JSON.stringify(additional_tips || []),
+        whatItDoes: what_it_does || null,
+        exampleOutput: example_output || null,
         tenantId,
         visibility,
         createdBy: user.id
@@ -226,7 +232,7 @@ app.post('/api/prompts', validateToken, extractTenant, requireRole('contributor'
 app.put('/api/prompts/:id', validateToken, extractTenant, requireRole('contributor'), auditLog('prompt_update'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, content, tags, complexity, visibility } = req.body;
+    const { title, description, content, tags, complexity, visibility, tips, additional_tips, what_it_does, example_output } = req.body;
     const { tenantId, user } = req;
 
     // Check ownership or admin rights
@@ -263,6 +269,10 @@ app.put('/api/prompts/:id', validateToken, extractTenant, requireRole('contribut
          word_count = COALESCE(@wordCount, word_count),
          complexity = COALESCE(@complexity, complexity),
          visibility = COALESCE(@visibility, visibility),
+         tips = COALESCE(@tips, tips),
+         additional_tips = COALESCE(@additionalTips, additional_tips),
+         what_it_does = COALESCE(@whatItDoes, what_it_does),
+         example_output = COALESCE(@exampleOutput, example_output),
          updated_by = @updatedBy,
          version = version + 1
        WHERE id = @id AND tenant_id = @tenantId`,
@@ -276,6 +286,10 @@ app.put('/api/prompts/:id', validateToken, extractTenant, requireRole('contribut
         wordCount: wordCount || null,
         complexity: complexity || null,
         visibility: visibility || null,
+        tips: tips ? JSON.stringify(tips) : null,
+        additionalTips: additional_tips ? JSON.stringify(additional_tips) : null,
+        whatItDoes: what_it_does || null,
+        exampleOutput: example_output || null,
         updatedBy: user.id
       }
     );
@@ -299,6 +313,34 @@ app.put('/api/prompts/:id', validateToken, extractTenant, requireRole('contribut
  * Delete a prompt (requires Admin role)
  */
 app.delete('/api/prompts/:id', validateToken, extractTenant, requireRole('admin'), auditLog('prompt_delete'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tenantId } = req;
+
+    const result = await executeQuery(
+      'DELETE FROM prompts WHERE id = @id AND tenant_id = @tenantId',
+      { id, tenantId }
+    );
+
+    res.json({
+      success: true,
+      message: 'Prompt deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting prompt:', error);
+    res.status(500).json({
+      error: 'server_error',
+      message: 'Failed to delete prompt'
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/prompts/:id
+ * Admin delete endpoint (alias for /api/prompts/:id)
+ */
+app.delete('/api/admin/prompts/:id', validateToken, extractTenant, requireRole('admin'), auditLog('prompt_delete'), async (req, res) => {
   try {
     const { id } = req.params;
     const { tenantId } = req;

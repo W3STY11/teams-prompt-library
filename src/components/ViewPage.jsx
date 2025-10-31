@@ -219,7 +219,24 @@ export default function ViewPage() {
       if (!response.ok) throw new Error('Prompt not found');
 
       const data = await response.json();
-      setPrompt(data.prompt || data);
+      let promptData = data.prompt || data;
+
+      // Parse additional_tips if it's a string (from SQL database)
+      if (promptData && typeof promptData.additional_tips === 'string') {
+        try {
+          promptData.additional_tips = JSON.parse(promptData.additional_tips);
+        } catch (e) {
+          console.warn('Failed to parse additional_tips:', e);
+          promptData.additional_tips = [];
+        }
+      }
+
+      // Ensure additional_tips is an array
+      if (promptData && !Array.isArray(promptData.additional_tips)) {
+        promptData.additional_tips = [];
+      }
+
+      setPrompt(promptData);
     } catch (error) {
       console.error('Failed to load prompt:', error);
       dispatchToast(
