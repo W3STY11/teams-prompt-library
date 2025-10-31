@@ -26,8 +26,8 @@ const SQL_CONFIG = {
   user: process.env.SQL_USER || 'sqladmin',
   password: process.env.SQL_PASSWORD,
   options: {
-    encrypt: process.env.SQL_ENCRYPT === 'true',
-    trustServerCertificate: process.env.SQL_TRUST_SERVER_CERTIFICATE === 'true'
+    encrypt: true,
+    trustServerCertificate: false
   }
 };
 

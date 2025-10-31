@@ -81,6 +81,13 @@ app.get('/api/prompts', async (req, res) => {
       if (prompt.metadata && typeof prompt.metadata === 'string') {
         prompt.metadata = JSON.parse(prompt.metadata);
       }
+      if (prompt.additional_tips && typeof prompt.additional_tips === 'string') {
+        try {
+          prompt.additional_tips = JSON.parse(prompt.additional_tips);
+        } catch (e) {
+          prompt.additional_tips = [];
+        }
+      }
       return prompt;
     });
 
@@ -121,6 +128,13 @@ app.get('/api/prompts/:id', async (req, res) => {
     }
     if (prompt.metadata && typeof prompt.metadata === 'string') {
       prompt.metadata = JSON.parse(prompt.metadata);
+    }
+    if (prompt.additional_tips && typeof prompt.additional_tips === 'string') {
+      try {
+        prompt.additional_tips = JSON.parse(prompt.additional_tips);
+      } catch (e) {
+        prompt.additional_tips = [];
+      }
     }
 
     res.json({ prompt });
