@@ -85,10 +85,14 @@ export default function CreatePromptModal({ isOpen, onClose, onUpdate }) {
     exampleInput: '',
     exampleOutput: '',
     images: '',
+    promptCategory: '',
+    worksIn: '',
   });
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [promptCategories, setPromptCategories] = useState([]);
+  const [worksInOptions, setWorksInOptions] = useState([]);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -109,9 +113,38 @@ export default function CreatePromptModal({ isOpen, onClose, onUpdate }) {
         exampleInput: '',
         exampleOutput: '',
         images: '',
+        promptCategory: '',
+        worksIn: '',
       });
       setErrors({});
       setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  // Fetch prompt categories and works-in options when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const loadOptions = async () => {
+        try {
+          const [categoriesRes, worksInRes] = await Promise.all([
+            fetch(`${API_ENDPOINTS.API_URL}/api/admin/prompt-categories`),
+            fetch(`${API_ENDPOINTS.API_URL}/api/admin/works-in`)
+          ]);
+
+          if (categoriesRes.ok) {
+            const categories = await categoriesRes.json();
+            setPromptCategories(categories);
+          }
+
+          if (worksInRes.ok) {
+            const worksIn = await worksInRes.json();
+            setWorksInOptions(worksIn);
+          }
+        } catch (error) {
+          console.error('Error loading options:', error);
+        }
+      };
+      loadOptions();
     }
   }, [isOpen]);
 
@@ -196,6 +229,12 @@ export default function CreatePromptModal({ isOpen, onClose, onUpdate }) {
         .map(img => img.trim())
         .filter(img => img.length > 0);
 
+      // Prepare works_in platforms
+      const worksInArray = formData.worksIn
+        .split(',')
+        .map(item => item.trim())
+        .filter(item => item.length > 0);
+
       // Calculate word count
       const wordCount = formData.content.trim().split(/\s+/).filter(w => w.length > 0).length;
 
@@ -203,6 +242,13 @@ export default function CreatePromptModal({ isOpen, onClose, onUpdate }) {
       const timestamp = Date.now();
       const random = Math.random().toString(36).substring(2, 11);
       const id = `prompt_${timestamp}_${random}`;
+
+      // Prepare metadata object
+      const metadata = {
+        whatItDoes: formData.whatItDoes.trim() || '',
+        howToUse: formData.howToUse.trim() || '',
+        exampleInput: formData.exampleInput.trim() || ''
+      };
 
       // Prepare new prompt data - all fields at top level for SQL backend
       const newPrompt = {
@@ -215,7 +261,7 @@ export default function CreatePromptModal({ isOpen, onClose, onUpdate }) {
         tags: tagsArray,
         tips: tipsArray,
         additional_tips: additionalTipsArray,
-        what_it_does: formData.whatItDoes.trim() || '',
+        metadata: metadata,
         example_output: formData.exampleOutput.trim() || '',
         images: imagesArray,
         icon: formData.icon,
@@ -223,6 +269,8 @@ export default function CreatePromptModal({ isOpen, onClose, onUpdate }) {
         word_count: wordCount,
         status: 'approved',
         date: new Date().toISOString().split('T')[0],
+        prompt_category: formData.promptCategory || null,
+        works_in_json: worksInArray.length > 0 ? JSON.stringify(worksInArray) : null,
       };
 
       // Send to API server
@@ -347,6 +395,39 @@ export default function CreatePromptModal({ isOpen, onClose, onUpdate }) {
                   value={formData.subcategory}
                   onChange={(e) => handleChange('subcategory', e.target.value)}
                   placeholder="e.g., Analytics & Research"
+                  disabled={isSubmitting}
+                />
+              </Field>
+
+              {/* Prompt Category */}
+              <Field
+                label="Prompt Category"
+                hint="Optional - categorize by action type"
+              >
+                <Dropdown
+                  placeholder="Select category (optional)"
+                  value={formData.promptCategory}
+                  onOptionSelect={(e, data) => handleChange('promptCategory', data.optionValue || '')}
+                  disabled={isSubmitting}
+                >
+                  <Option value="">None</Option>
+                  {promptCategories.map(category => (
+                    <Option key={category.id} value={category.name}>
+                      {category.name}
+                    </Option>
+                  ))}
+                </Dropdown>
+              </Field>
+
+              {/* Works In Platforms */}
+              <Field
+                label="Works In Platforms"
+                hint="Optional - comma-separated platforms (e.g., Teams, ChatGPT)"
+              >
+                <Input
+                  value={formData.worksIn}
+                  onChange={(e) => handleChange('worksIn', e.target.value)}
+                  placeholder="e.g., Teams, Outlook, ChatGPT"
                   disabled={isSubmitting}
                 />
               </Field>

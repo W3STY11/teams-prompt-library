@@ -20,8 +20,8 @@ const SQL_CONFIG = {
   user: process.env.SQL_USER || 'sqladmin',
   password: process.env.SQL_PASSWORD,
   options: {
-    encrypt: process.env.SQL_ENCRYPT === 'true',
-    trustServerCertificate: process.env.SQL_TRUST_SERVER_CERTIFICATE === 'true'
+    encrypt: true,
+    trustServerCertificate: false
   }
 };
 
@@ -41,7 +41,7 @@ async function runMigration() {
     console.log('✅ Connected to SQL\n');
 
     // Read migration script
-    const migrationPath = path.join(__dirname, 'add-missing-fields.sql');
+    const migrationPath = path.join(__dirname, 'create-prompt-categories-and-works-in.sql');
     const migrationSQL = fs.readFileSync(migrationPath, 'utf-8');
 
     console.log('📄 Migration script:');

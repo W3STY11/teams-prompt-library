@@ -552,6 +552,272 @@ app.get('/api/departments', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
+// PROMPT CATEGORIES ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/admin/prompt-categories
+ * Get all prompt categories (admin endpoint)
+ */
+app.get('/api/admin/prompt-categories', async (req, res) => {
+  try {
+    const categories = await executeQuery(
+      'SELECT * FROM prompt_categories ORDER BY display_order'
+    );
+
+    res.json(categories);
+
+  } catch (error) {
+    console.error('Error fetching prompt categories:', error);
+    res.status(500).json({
+      error: 'server_error',
+      message: 'Failed to fetch prompt categories'
+    });
+  }
+});
+
+/**
+ * POST /api/admin/prompt-categories
+ * Create a new prompt category (admin only)
+ */
+app.post('/api/admin/prompt-categories', validateToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { name, display_order = 999 } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'Name is required'
+      });
+    }
+
+    await executeQuery(
+      `INSERT INTO prompt_categories (name, display_order)
+       VALUES (@name, @displayOrder)`,
+      { name, displayOrder: display_order }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Prompt category created successfully'
+    });
+
+  } catch (error) {
+    if (error.message.includes('UNIQUE')) {
+      return res.status(409).json({
+        error: 'duplicate',
+        message: 'A category with this name already exists'
+      });
+    }
+
+    console.error('Error creating prompt category:', error);
+    res.status(500).json({
+      error: 'server_error',
+      message: 'Failed to create prompt category'
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/prompt-categories/:id
+ * Update a prompt category (admin only)
+ */
+app.put('/api/admin/prompt-categories/:id', validateToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, display_order } = req.body;
+
+    await executeQuery(
+      `UPDATE prompt_categories
+       SET name = @name,
+           display_order = @displayOrder,
+           updated_at = GETDATE()
+       WHERE id = @id`,
+      { id, name, displayOrder: display_order }
+    );
+
+    res.json({
+      success: true,
+      message: 'Prompt category updated successfully'
+    });
+
+  } catch (error) {
+    if (error.message.includes('UNIQUE')) {
+      return res.status(409).json({
+        error: 'duplicate',
+        message: 'A category with this name already exists'
+      });
+    }
+
+    console.error('Error updating prompt category:', error);
+    res.status(500).json({
+      error: 'server_error',
+      message: 'Failed to update prompt category'
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/prompt-categories/:id
+ * Delete a prompt category (admin only)
+ */
+app.delete('/api/admin/prompt-categories/:id', validateToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await executeQuery(
+      'DELETE FROM prompt_categories WHERE id = @id',
+      { id }
+    );
+
+    res.json({
+      success: true,
+      message: 'Prompt category deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting prompt category:', error);
+    res.status(500).json({
+      error: 'server_error',
+      message: 'Failed to delete prompt category'
+    });
+  }
+});
+
+// ============================================================================
+// WORKS IN ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/admin/works-in
+ * Get all works-in platforms (admin endpoint)
+ */
+app.get('/api/admin/works-in', async (req, res) => {
+  try {
+    const platforms = await executeQuery(
+      'SELECT * FROM works_in ORDER BY display_order'
+    );
+
+    res.json(platforms);
+
+  } catch (error) {
+    console.error('Error fetching works-in platforms:', error);
+    res.status(500).json({
+      error: 'server_error',
+      message: 'Failed to fetch works-in platforms'
+    });
+  }
+});
+
+/**
+ * POST /api/admin/works-in
+ * Create a new works-in platform (admin only)
+ */
+app.post('/api/admin/works-in', validateToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { name, display_order = 999 } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'Name is required'
+      });
+    }
+
+    await executeQuery(
+      `INSERT INTO works_in (name, display_order)
+       VALUES (@name, @displayOrder)`,
+      { name, displayOrder: display_order }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Works-in platform created successfully'
+    });
+
+  } catch (error) {
+    if (error.message.includes('UNIQUE')) {
+      return res.status(409).json({
+        error: 'duplicate',
+        message: 'A platform with this name already exists'
+      });
+    }
+
+    console.error('Error creating works-in platform:', error);
+    res.status(500).json({
+      error: 'server_error',
+      message: 'Failed to create works-in platform'
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/works-in/:id
+ * Update a works-in platform (admin only)
+ */
+app.put('/api/admin/works-in/:id', validateToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, display_order } = req.body;
+
+    await executeQuery(
+      `UPDATE works_in
+       SET name = @name,
+           display_order = @displayOrder,
+           updated_at = GETDATE()
+       WHERE id = @id`,
+      { id, name, displayOrder: display_order }
+    );
+
+    res.json({
+      success: true,
+      message: 'Works-in platform updated successfully'
+    });
+
+  } catch (error) {
+    if (error.message.includes('UNIQUE')) {
+      return res.status(409).json({
+        error: 'duplicate',
+        message: 'A platform with this name already exists'
+      });
+    }
+
+    console.error('Error updating works-in platform:', error);
+    res.status(500).json({
+      error: 'server_error',
+      message: 'Failed to update works-in platform'
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/works-in/:id
+ * Delete a works-in platform (admin only)
+ */
+app.delete('/api/admin/works-in/:id', validateToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await executeQuery(
+      'DELETE FROM works_in WHERE id = @id',
+      { id }
+    );
+
+    res.json({
+      success: true,
+      message: 'Works-in platform deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting works-in platform:', error);
+    res.status(500).json({
+      error: 'server_error',
+      message: 'Failed to delete works-in platform'
+    });
+  }
+});
+
+// ============================================================================
 // ANALYTICS ENDPOINTS (Admin only)
 // ============================================================================
 

@@ -49,21 +49,28 @@ app.get('/api/prompts', async (req, res) => {
   try {
     const { department, search, limit = 10000 } = req.query;
 
-    let query = 'SELECT TOP (@limit) * FROM prompts WHERE 1=1';
+    let query = `
+      SELECT TOP (@limit)
+        p.*,
+        pc.name as prompt_category
+      FROM prompts p
+      LEFT JOIN prompt_categories pc ON p.prompt_category_id = pc.id
+      WHERE 1=1
+    `;
     const request = pool.request();
     request.input('limit', sql.Int, parseInt(limit));
-    
+
     if (department) {
-      query += ' AND department = @department';
+      query += ' AND p.department = @department';
       request.input('department', sql.NVarChar, department);
     }
-    
+
     if (search) {
-      query += ' AND (title LIKE @search OR description LIKE @search OR content LIKE @search)';
+      query += ' AND (p.title LIKE @search OR p.description LIKE @search OR p.content LIKE @search)';
       request.input('search', sql.NVarChar, `%${search}%`);
     }
-    
-    query += ' ORDER BY created_at DESC';
+
+    query += ' ORDER BY p.created_at DESC';
 
     const result = await request.query(query);
 
@@ -78,9 +85,6 @@ app.get('/api/prompts', async (req, res) => {
       if (prompt.images && typeof prompt.images === 'string') {
         prompt.images = JSON.parse(prompt.images);
       }
-      if (prompt.metadata && typeof prompt.metadata === 'string') {
-        prompt.metadata = JSON.parse(prompt.metadata);
-      }
       if (prompt.additional_tips && typeof prompt.additional_tips === 'string') {
         try {
           prompt.additional_tips = JSON.parse(prompt.additional_tips);
@@ -88,26 +92,42 @@ app.get('/api/prompts', async (req, res) => {
           prompt.additional_tips = [];
         }
       }
+
+      // Parse metadata JSON and extract fields to top level
+      if (prompt.metadata && typeof prompt.metadata === 'string') {
+        try {
+          const metadata = JSON.parse(prompt.metadata);
+          prompt.metadata = metadata;
+          // Extract metadata fields to top level for easier access
+          prompt.what_it_does = metadata.whatItDoes || metadata.what_it_does || null;
+          prompt.how_to_use = metadata.howToUse || metadata.how_to_use || null;
+          prompt.example_input = metadata.exampleInput || metadata.example_input || null;
+        } catch (e) {
+          prompt.metadata = null;
+        }
+      }
+
       return prompt;
     });
 
-    // Extract unique departments with counts and icons
-    const departmentMap = new Map();
-    prompts.forEach(prompt => {
-      if (prompt.department) {
-        if (!departmentMap.has(prompt.department)) {
-          departmentMap.set(prompt.department, {
-            name: prompt.department,
-            icon: prompt.icon || '📁',
-            prompt_count: 0
-          });
-        }
-        departmentMap.get(prompt.department).prompt_count++;
-      }
-    });
+    // Get departments from departments table (includes departments with 0 prompts)
+    const deptResult = await pool.request().query(`
+      SELECT
+        d.name,
+        d.icon,
+        d.display_order,
+        COUNT(p.id) as prompt_count
+      FROM departments d
+      LEFT JOIN prompts p ON d.name = p.department
+      GROUP BY d.name, d.icon, d.display_order
+      ORDER BY d.display_order, d.name
+    `);
 
-    const departments = Array.from(departmentMap.values())
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const departments = deptResult.recordset.map(d => ({
+      name: d.name,
+      icon: d.icon || '📁',
+      prompt_count: d.prompt_count
+    }));
 
     res.json({
       prompts,
@@ -128,7 +148,14 @@ app.get('/api/prompts/:id', async (req, res) => {
 
     const result = await pool.request()
       .input('id', sql.NVarChar, id)
-      .query('SELECT * FROM prompts WHERE id = @id');
+      .query(`
+        SELECT
+          p.*,
+          pc.name as prompt_category
+        FROM prompts p
+        LEFT JOIN prompt_categories pc ON p.prompt_category_id = pc.id
+        WHERE p.id = @id
+      `);
 
     if (result.recordset.length === 0) {
       return res.status(404).json({ error: 'Prompt not found' });
@@ -145,14 +172,25 @@ app.get('/api/prompts/:id', async (req, res) => {
     if (prompt.images && typeof prompt.images === 'string') {
       prompt.images = JSON.parse(prompt.images);
     }
-    if (prompt.metadata && typeof prompt.metadata === 'string') {
-      prompt.metadata = JSON.parse(prompt.metadata);
-    }
     if (prompt.additional_tips && typeof prompt.additional_tips === 'string') {
       try {
         prompt.additional_tips = JSON.parse(prompt.additional_tips);
       } catch (e) {
         prompt.additional_tips = [];
+      }
+    }
+
+    // Parse metadata JSON and extract fields to top level
+    if (prompt.metadata && typeof prompt.metadata === 'string') {
+      try {
+        const metadata = JSON.parse(prompt.metadata);
+        prompt.metadata = metadata;
+        // Extract metadata fields to top level for easier access
+        prompt.what_it_does = metadata.whatItDoes || metadata.what_it_does || null;
+        prompt.how_to_use = metadata.howToUse || metadata.how_to_use || null;
+        prompt.example_input = metadata.exampleInput || metadata.example_input || null;
+      } catch (e) {
+        prompt.metadata = null;
       }
     }
 
@@ -167,36 +205,27 @@ app.get('/api/prompts/:id', async (req, res) => {
 // Get departments (derive from prompts table)
 app.get('/api/departments', async (req, res) => {
   try {
+    // Query departments table with LEFT JOIN to count prompts (includes departments with 0 prompts)
     const result = await pool.request().query(`
-      SELECT 
-        department as name,
-        COUNT(*) as prompt_count
-      FROM prompts
-      GROUP BY department
-      ORDER BY department
+      SELECT
+        d.name,
+        d.icon,
+        d.display_order,
+        COUNT(p.id) as prompt_count
+      FROM departments d
+      LEFT JOIN prompts p ON d.name = p.department
+      GROUP BY d.name, d.icon, d.display_order
+      ORDER BY d.display_order, d.name
     `);
-    
-    // Add icons based on department name
-    const icons = {
-      'Business': '💼',
-      'Marketing': '📢',
-      'Sales': '💰',
-      'SEO': '🔍',
-      'Finance': '💵',
-      'Education': '📚',
-      'Writing': '✍️',
-      'Productivity': '⚡',
-      'Solopreneurs': '🚀'
-    };
-    
+
     const departments = result.recordset.map(d => ({
       name: d.name,
-      icon: icons[d.name] || '📁',
+      icon: d.icon || '📁',
       prompt_count: d.prompt_count
     }));
-    
+
     res.json(departments);
-    
+
   } catch (error) {
     console.error('Error fetching departments:', error);
     res.status(500).json({ error: 'Failed to fetch departments', details: error.message });
@@ -472,7 +501,8 @@ app.post('/api/admin/prompts', async (req, res) => {
   try {
     const {
       title, department, subcategory, description, content,
-      tags, tips, images, icon, complexity, word_count, metadata
+      tags, tips, additional_tips, images, icon, complexity, word_count, metadata,
+      prompt_category, works_in_json
     } = req.body;
 
     // Generate unique ID
@@ -480,6 +510,17 @@ app.post('/api/admin/prompts', async (req, res) => {
 
     // Calculate word count if not provided
     const finalWordCount = word_count || (content ? content.split(/\s+/).length : 0);
+
+    // Look up prompt_category_id if prompt_category name is provided
+    let promptCategoryId = null;
+    if (prompt_category) {
+      const categoryResult = await pool.request()
+        .input('name', sql.NVarChar, prompt_category)
+        .query('SELECT id FROM prompt_categories WHERE name = @name');
+      if (categoryResult.recordset.length > 0) {
+        promptCategoryId = categoryResult.recordset[0].id;
+      }
+    }
 
     const result = await pool.request()
       .input('id', sql.NVarChar, id)
@@ -490,11 +531,14 @@ app.post('/api/admin/prompts', async (req, res) => {
       .input('content', sql.NVarChar(sql.MAX), content || '')
       .input('tags', sql.NVarChar(sql.MAX), JSON.stringify(tags || []))
       .input('tips', sql.NVarChar(sql.MAX), JSON.stringify(tips || []))
+      .input('additional_tips', sql.NVarChar(sql.MAX), JSON.stringify(additional_tips || []))
       .input('images', sql.NVarChar(sql.MAX), JSON.stringify(images || []))
       .input('metadata', sql.NVarChar(sql.MAX), metadata ? JSON.stringify(metadata) : null)
       .input('icon', sql.NVarChar, icon || '📝')
       .input('complexity', sql.NVarChar, complexity || 'intermediate')
       .input('word_count', sql.Int, finalWordCount)
+      .input('prompt_category_id', sql.Int, promptCategoryId)
+      .input('works_in_json', sql.NVarChar(sql.MAX), works_in_json || null)
       .input('tenant_id', sql.NVarChar, '1350831b-3d20-4491-af55-49b3d67b492f')
       .input('is_shared', sql.Bit, 1)
       .input('visibility', sql.NVarChar, 'tenant')
@@ -502,12 +546,14 @@ app.post('/api/admin/prompts', async (req, res) => {
       .query(`
         INSERT INTO prompts (
           id, title, department, subcategory, description, content,
-          tags, tips, images, metadata, icon, complexity, word_count,
+          tags, tips, additional_tips, images, metadata, icon, complexity, word_count,
+          prompt_category_id, works_in_json,
           tenant_id, is_shared, visibility, created_at, updated_at,
           created_by, view_count, favorite_count, copy_count, version
         ) VALUES (
           @id, @title, @department, @subcategory, @description, @content,
-          @tags, @tips, @images, @metadata, @icon, @complexity, @word_count,
+          @tags, @tips, @additional_tips, @images, @metadata, @icon, @complexity, @word_count,
+          @prompt_category_id, @works_in_json,
           @tenant_id, @is_shared, @visibility, GETDATE(), GETDATE(),
           @created_by, 0, 0, 0, 1
         )
@@ -701,6 +747,182 @@ app.post('/api/admin/prompts/bulk', async (req, res) => {
   } catch (error) {
     console.error('Error bulk creating prompts:', error);
     res.status(500).json({ error: 'Failed to bulk create prompts', details: error.message });
+  }
+});
+
+// ============================================================================
+// PROMPT CATEGORIES ENDPOINTS
+// ============================================================================
+
+// Get all prompt categories
+app.get('/api/admin/prompt-categories', async (req, res) => {
+  try {
+    const result = await pool.request().query(
+      'SELECT * FROM prompt_categories ORDER BY display_order'
+    );
+    res.json(result.recordset);
+  } catch (error) {
+    console.error('Error fetching prompt categories:', error);
+    res.status(500).json({ error: 'Failed to fetch prompt categories' });
+  }
+});
+
+// Create new prompt category
+app.post('/api/admin/prompt-categories', async (req, res) => {
+  try {
+    const { name, display_order = 999 } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    await pool.request()
+      .input('name', sql.NVarChar, name)
+      .input('displayOrder', sql.Int, display_order)
+      .query(`
+        INSERT INTO prompt_categories (name, display_order)
+        VALUES (@name, @displayOrder)
+      `);
+
+    res.status(201).json({ success: true, message: 'Prompt category created successfully' });
+  } catch (error) {
+    if (error.message.includes('UNIQUE')) {
+      return res.status(409).json({ error: 'A category with this name already exists' });
+    }
+    console.error('Error creating prompt category:', error);
+    res.status(500).json({ error: 'Failed to create prompt category' });
+  }
+});
+
+// Update prompt category
+app.put('/api/admin/prompt-categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, display_order } = req.body;
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('name', sql.NVarChar, name)
+      .input('displayOrder', sql.Int, display_order)
+      .query(`
+        UPDATE prompt_categories
+        SET name = @name,
+            display_order = @displayOrder,
+            updated_at = GETDATE()
+        WHERE id = @id
+      `);
+
+    res.json({ success: true, message: 'Prompt category updated successfully' });
+  } catch (error) {
+    if (error.message.includes('UNIQUE')) {
+      return res.status(409).json({ error: 'A category with this name already exists' });
+    }
+    console.error('Error updating prompt category:', error);
+    res.status(500).json({ error: 'Failed to update prompt category' });
+  }
+});
+
+// Delete prompt category
+app.delete('/api/admin/prompt-categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .query('DELETE FROM prompt_categories WHERE id = @id');
+
+    res.json({ success: true, message: 'Prompt category deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting prompt category:', error);
+    res.status(500).json({ error: 'Failed to delete prompt category' });
+  }
+});
+
+// ============================================================================
+// WORKS IN ENDPOINTS
+// ============================================================================
+
+// Get all works-in platforms
+app.get('/api/admin/works-in', async (req, res) => {
+  try {
+    const result = await pool.request().query(
+      'SELECT * FROM works_in ORDER BY display_order'
+    );
+    res.json(result.recordset);
+  } catch (error) {
+    console.error('Error fetching works-in platforms:', error);
+    res.status(500).json({ error: 'Failed to fetch works-in platforms' });
+  }
+});
+
+// Create new works-in platform
+app.post('/api/admin/works-in', async (req, res) => {
+  try {
+    const { name, display_order = 999 } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    await pool.request()
+      .input('name', sql.NVarChar, name)
+      .input('displayOrder', sql.Int, display_order)
+      .query(`
+        INSERT INTO works_in (name, display_order)
+        VALUES (@name, @displayOrder)
+      `);
+
+    res.status(201).json({ success: true, message: 'Works-in platform created successfully' });
+  } catch (error) {
+    if (error.message.includes('UNIQUE')) {
+      return res.status(409).json({ error: 'A platform with this name already exists' });
+    }
+    console.error('Error creating works-in platform:', error);
+    res.status(500).json({ error: 'Failed to create works-in platform' });
+  }
+});
+
+// Update works-in platform
+app.put('/api/admin/works-in/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, display_order } = req.body;
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('name', sql.NVarChar, name)
+      .input('displayOrder', sql.Int, display_order)
+      .query(`
+        UPDATE works_in
+        SET name = @name,
+            display_order = @displayOrder,
+            updated_at = GETDATE()
+        WHERE id = @id
+      `);
+
+    res.json({ success: true, message: 'Works-in platform updated successfully' });
+  } catch (error) {
+    if (error.message.includes('UNIQUE')) {
+      return res.status(409).json({ error: 'A platform with this name already exists' });
+    }
+    console.error('Error updating works-in platform:', error);
+    res.status(500).json({ error: 'Failed to update works-in platform' });
+  }
+});
+
+// Delete works-in platform
+app.delete('/api/admin/works-in/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .query('DELETE FROM works_in WHERE id = @id');
+
+    res.json({ success: true, message: 'Works-in platform deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting works-in platform:', error);
+    res.status(500).json({ error: 'Failed to delete works-in platform' });
   }
 });
 
