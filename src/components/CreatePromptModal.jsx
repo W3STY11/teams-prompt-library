@@ -52,18 +52,6 @@ const useStyles = makeStyles({
   },
 });
 
-const DEPARTMENTS = [
-  { name: 'Business', icon: '💼' },
-  { name: 'Marketing', icon: '📢' },
-  { name: 'Sales', icon: '💰' },
-  { name: 'SEO', icon: '🔍' },
-  { name: 'Finance', icon: '💵' },
-  { name: 'Education', icon: '📚' },
-  { name: 'Writing', icon: '✍️' },
-  { name: 'Productivity', icon: '⚡' },
-  { name: 'Solopreneurs', icon: '🚀' },
-];
-
 export default function CreatePromptModal({ isOpen, onClose, onUpdate }) {
   const styles = useStyles();
   const toasterId = useId('create-prompt-toaster');
@@ -91,6 +79,8 @@ export default function CreatePromptModal({ isOpen, onClose, onUpdate }) {
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [departments, setDepartments] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
   const [promptCategories, setPromptCategories] = useState([]);
   const [worksInOptions, setWorksInOptions] = useState([]);
 
@@ -121,15 +111,27 @@ export default function CreatePromptModal({ isOpen, onClose, onUpdate }) {
     }
   }, [isOpen]);
 
-  // Fetch prompt categories and works-in options when modal opens
+  // Fetch all dropdown options from API when modal opens
   useEffect(() => {
     if (isOpen) {
       const loadOptions = async () => {
         try {
-          const [categoriesRes, worksInRes] = await Promise.all([
+          const [departmentsRes, subcategoriesRes, categoriesRes, worksInRes] = await Promise.all([
+            fetch(`${API_ENDPOINTS.API_URL}/api/admin/departments`),
+            fetch(`${API_ENDPOINTS.API_URL}/api/admin/subcategories`),
             fetch(`${API_ENDPOINTS.API_URL}/api/admin/prompt-categories`),
             fetch(`${API_ENDPOINTS.API_URL}/api/admin/works-in`)
           ]);
+
+          if (departmentsRes.ok) {
+            const depts = await departmentsRes.json();
+            setDepartments(depts);
+          }
+
+          if (subcategoriesRes.ok) {
+            const subs = await subcategoriesRes.json();
+            setSubcategories(subs);
+          }
 
           if (categoriesRes.ok) {
             const categories = await categoriesRes.json();
@@ -151,12 +153,12 @@ export default function CreatePromptModal({ isOpen, onClose, onUpdate }) {
   // Update icon when department changes
   useEffect(() => {
     if (formData.department) {
-      const dept = DEPARTMENTS.find(d => d.name === formData.department);
+      const dept = departments.find(d => d.name === formData.department);
       if (dept && dept.icon !== formData.icon) {
         setFormData(prev => ({ ...prev, icon: dept.icon }));
       }
     }
-  }, [formData.department]);
+  }, [formData.department, departments]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -376,8 +378,8 @@ export default function CreatePromptModal({ isOpen, onClose, onUpdate }) {
                   onOptionSelect={(e, data) => handleChange('department', data.optionValue || '')}
                   disabled={isSubmitting}
                 >
-                  {DEPARTMENTS.map(dept => (
-                    <Option key={dept.name} value={dept.name}>
+                  {departments.map(dept => (
+                    <Option key={dept.id} value={dept.name}>
                       {dept.icon} {dept.name}
                     </Option>
                   ))}
